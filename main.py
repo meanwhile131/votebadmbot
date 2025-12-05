@@ -77,6 +77,8 @@ async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caster = update.effective_user.id
     try:
         poll_id, vote = map(int, query.data.split())
+        if vote not in [0, 1]:
+            raise ValueError
     except ValueError:
         await query.answer("Ошибка данных голоса.")
         return
