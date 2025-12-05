@@ -20,7 +20,7 @@ db.commit()
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.WARN
+    level=logging.INFO
 )
 token = os.getenv("BOT_TOKEN")
 if not token:
