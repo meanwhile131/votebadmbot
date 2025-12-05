@@ -3,6 +3,7 @@ import logging
 from enum import Enum
 import sqlite3
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, filters, MessageHandler, CallbackQueryHandler
 
 
@@ -14,7 +15,7 @@ class UserConversationState(Enum):
 db = sqlite3.connect('bot.db')
 cur = db.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS polls(id INTEGER PRIMARY KEY, owner INTEGER, title TEXT);")
-cur.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster INTEGER, vote INTEGER);")
+cur.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, caster_name TEXT);")
 db.commit()
 
 logging.basicConfig(
@@ -30,7 +31,8 @@ if not token:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == filters.ChatType.PRIVATE:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="""Команды:
-/new - создать голосование""")
+/new - создать голосование
+/results `номер_опроса` - посмотреть результаты опроса""", parse_mode=ParseMode.MARKDOWN_V2)
         return
     if len(context.args) == 1:
         try:
@@ -69,12 +71,15 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["state"] = UserConversationState.NONE
     poll_url = f"https://t.me/AnonymousPollBot?startgroup={new_id}"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"""Создан опрос #{new_id}.
-Вы можете опубликовать его в группе используя ссылку: {poll_url}""")
+Вы можете опубликовать его в группе используя ссылку: {poll_url}
+Вы сможете посмотреть результаты командой:
+/results `{new_id}`""", parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    caster = update.effective_user.id
+    caster_id = update.effective_user.id
+    caster_name = f"{update.effective_user.first_name} {update.effective_user.last_name}"
     try:
         poll_id, vote = map(int, query.data.split())
         if vote not in [0, 1]:
@@ -87,7 +92,7 @@ async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not poll_found:
         await query.answer("Не существует такого опроса.")
         return
-    cursor = cur.execute("SELECT vote FROM votes WHERE poll_id = ? AND caster = ?;", [poll_id, caster])
+    cursor = cur.execute("SELECT vote FROM votes WHERE poll_id = ? AND caster_id = ?;", [poll_id, caster_id])
     votes = cursor.fetchall()
     vote_exists = len(votes) > 0
     if vote_exists:
@@ -95,20 +100,50 @@ async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if vote == existing_vote[0]:
             await query.answer("Голос не изменен.")
             return
-        cursor = cur.execute("UPDATE votes SET vote = ? WHERE poll_id = ? AND caster = ?;", [vote, poll_id, caster])
+        cursor = cur.execute("UPDATE votes SET vote = ? WHERE poll_id = ? AND caster_id = ?;", [vote, poll_id, caster_id])
         db.commit()
         if cursor.rowcount < 1:
             await query.answer("Ошибка сохранения голоса.")
             return
         await query.answer("Голос изменен.")
         return
-    cursor = cur.execute("INSERT INTO votes(poll_id, caster, vote) VALUES(?,?,?);", [poll_id, caster, vote])
+    cursor = cur.execute("INSERT INTO votes(poll_id, caster_id, vote, caster_name) VALUES(?,?,?,?);", [poll_id, caster_id, vote, caster_name])
     db.commit()
     if cursor.rowcount < 1:
         await query.answer("Ошибка сохранения голоса.")
         return
     await query.answer("Голос сохранен.")
 
+async def results(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 1:
+        await context.bot.send_message(update.effective_chat.id, """Укажите опрос, для которого нужно посмотреть результаты:
+/results `номер_опроса`""", parse_mode=ParseMode.MARKDOWN_V2)
+        return
+
+    try:
+        poll_id = int(context.args[0])
+    except ValueError:
+        await context.bot.send_message(update.effective_chat.id, "Номер опроса нужно указать как число.")
+        return
+
+    cursor = cur.execute("SELECT * FROM polls WHERE id = ?;", [poll_id])
+    polls = cursor.fetchall()
+    poll_found = len(polls) > 0
+    if not poll_found:
+        await context.bot.send_message(update.effective_chat.id, f"Опрос #{poll_id} не найден.")
+        return
+    poll = polls[0]
+    if poll[1] != update.effective_user.id:
+        await context.bot.send_message(update.effective_chat.id, f"Только создатель опроса может смотреть его результаты.")
+        return
+    msg = f"""Результаты опроса "{poll[2]}" (#{poll_id}):\n"""
+    cursor = cur.execute("SELECT caster_name, vote FROM votes WHERE poll_id = ?;", [poll_id])
+    votes = cursor.fetchall()
+    for vote in votes:
+        vote_text = "Буду" if vote[1] == 1 else "Не буду"
+        caster = vote[0]
+        msg += f"""{caster}: {vote_text}\n"""
+    await context.bot.send_message(update.effective_chat.id, msg)
 
 if __name__ == '__main__':
     application = ApplicationBuilder().token(token).build()
@@ -121,5 +156,7 @@ if __name__ == '__main__':
     application.add_handler(message_handler)
     vote_button_handler = CallbackQueryHandler(vote_button)
     application.add_handler(vote_button_handler)
+    results_handler = CommandHandler('results', results, filters.ChatType.PRIVATE)
+    application.add_handler(results_handler)
 
     application.run_polling()
