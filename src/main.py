@@ -67,7 +67,8 @@ async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data["state"] == UserConversationState.SETTING_TITLE:
+    state = context.user_data.get("state")
+    if state == UserConversationState.SETTING_TITLE:
         cursor = cur.execute("INSERT INTO polls(owner,title) VALUES(?,?) RETURNING id;",
                              [update.effective_chat.id, update.message.text])
         new_id = cursor.fetchone()[0]
@@ -78,7 +79,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Вы можете опубликовать его в группе используя ссылку: {poll_url}
 Вы сможете посмотреть результаты командой:
 /results""")
-    elif context.user_data["state"] == UserConversationState.SETTING_POLL_ID_FOR_RESULT:
+    elif state == UserConversationState.SETTING_POLL_ID_FOR_RESULT:
         try:
             poll_id = int(update.message.text)
         except ValueError:
