@@ -1,6 +1,7 @@
 import os
 import logging
 from enum import Enum
+import time
 import sqlite3
 from pathlib import Path
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -16,7 +17,7 @@ Path("data").mkdir(parents=True, exist_ok=True)
 db = sqlite3.connect('data/bot.db')
 cur = db.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS polls(id INTEGER PRIMARY KEY, owner INTEGER, title TEXT);")
-cur.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, caster_name TEXT);")
+cur.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, caster_name TEXT, timestamp INTEGER);")
 db.commit()
 
 logging.basicConfig(
@@ -78,6 +79,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    timestamp = int(time.time())
     query = update.callback_query
     caster_id = update.effective_user.id
     caster_name = f"{update.effective_user.first_name} {update.effective_user.last_name}"
@@ -101,14 +103,14 @@ async def vote_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if vote == existing_vote[0]:
             await query.answer("Голос не изменен.")
             return
-        cursor = cur.execute("UPDATE votes SET vote = ? WHERE poll_id = ? AND caster_id = ?;", [vote, poll_id, caster_id])
+        cursor = cur.execute("UPDATE votes SET vote = ?, timestamp = ? WHERE poll_id = ? AND caster_id = ?;", [vote, timestamp, poll_id, caster_id])
         db.commit()
         if cursor.rowcount < 1:
             await query.answer("Ошибка сохранения голоса.")
             return
         await query.answer("Голос изменен.")
         return
-    cursor = cur.execute("INSERT INTO votes(poll_id, caster_id, vote, caster_name) VALUES(?,?,?,?);", [poll_id, caster_id, vote, caster_name])
+    cursor = cur.execute("INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(?,?,?,?,?);", [poll_id, caster_id, vote, caster_name, timestamp])
     db.commit()
     if cursor.rowcount < 1:
         await query.answer("Ошибка сохранения голоса.")
