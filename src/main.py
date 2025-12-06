@@ -140,12 +140,14 @@ async def results(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(update.effective_chat.id, f"Только создатель опроса может смотреть его результаты.")
         return
     msg = f"""Результаты опроса "{poll[2]}" (#<code>{poll_id}</code>):\n"""
-    cursor = cur.execute("SELECT caster_name, vote FROM votes WHERE poll_id = ?;", [poll_id])
+    cursor = cur.execute("SELECT caster_name, vote, timestamp FROM votes WHERE poll_id = ? ORDER BY timestamp ASC;", [poll_id])
     votes = cursor.fetchall()
     for vote in votes:
         vote_text = "Буду" if vote[1] == 1 else "Не буду"
         caster = vote[0]
-        msg += f"""{caster}: {vote_text}\n"""
+        timestamp = vote[2]
+        time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+        msg += f"""<code>{time_str}</code> {caster}<code>: {vote_text}</code>\n"""
     await context.bot.send_message(update.effective_chat.id, msg, parse_mode=ParseMode.HTML)
 
 if __name__ == '__main__':
