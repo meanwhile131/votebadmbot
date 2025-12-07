@@ -21,6 +21,7 @@ cur = db.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS polls(id INTEGER PRIMARY KEY, owner INTEGER, title TEXT);")
 cur.execute(
     "CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, caster_name TEXT, timestamp INTEGER);")
+cur.execute("CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY);")
 db.commit()
 
 logging.basicConfig(
@@ -62,6 +63,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    cursor = cur.execute("SELECT 1 FROM admins WHERE id = ?;", [user_id])
+    found = len(cursor.fetchall()) > 0
+    if not found:
+        await context.bot.send_message(update.effective_chat.id, "Только администраторы бота могут создавать голосования.")
+        return
     context.user_data["state"] = UserConversationState.SETTING_TITLE
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Напишите заголовок опроса.")
 
