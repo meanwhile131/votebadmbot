@@ -97,16 +97,25 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(update.effective_chat.id,
                                            f"Только создатель опроса может смотреть его результаты.")
             return
-        msg = f"""Результаты опроса "{poll[2]}" (#{poll_id}):\n"""
-        cursor = cur.execute("SELECT caster_name, vote, timestamp FROM votes WHERE poll_id = ? ORDER BY timestamp ASC;",
+        msg = f'Результаты опроса "{poll[2]}" (#{poll_id}):\n'
+
+        cursor = cur.execute("SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 1 ORDER BY timestamp ASC;",
                              [poll_id])
-        votes = cursor.fetchall()
-        for vote in votes:
-            vote_text = "Буду" if vote[1] == 1 else "Не буду"
+        votes_1 = cursor.fetchall()
+        msg += f"\nБуду ({len(votes_1)}):<pre>\n"
+        for vote in votes_1:
             caster = vote[0]
-            timestamp = vote[2]
-            time_str = time.strftime("%m-%d %H:%M", time.localtime(timestamp))
-            msg += f"""<code>{time_str}</code> {caster}<code>: {vote_text}</code>\n"""
+            msg += f"{caster}\n"
+        msg += "</pre>"
+
+        cursor = cur.execute("SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 0 ORDER BY timestamp ASC;",
+                             [poll_id])
+        votes_0 = cursor.fetchall()
+        msg += f"\nНе буду ({len(votes_0)}):<pre>\n"
+        for vote in votes_0:
+            caster = vote[0]
+            msg += f"{caster}\n"
+        msg += "</pre>"
         context.user_data["state"] = UserConversationState.NONE
         await context.bot.send_message(update.effective_chat.id, msg, parse_mode=ParseMode.HTML)
 
