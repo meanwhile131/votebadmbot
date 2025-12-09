@@ -11,10 +11,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY src src
 
 RUN useradd -m appuser
 RUN mkdir data && chmod 700 data && chown -R appuser data
+COPY src src
 USER appuser
 
 CMD ["python", "src/main.py"]
