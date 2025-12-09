@@ -2,8 +2,6 @@ name: Build Docker container
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 env:
   IMAGE_NAME: anonymous_poll_bot
