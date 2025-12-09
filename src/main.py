@@ -191,4 +191,4 @@ if __name__ == '__main__':
     results_handler = CommandHandler('results', results, filters.ChatType.PRIVATE)
     application.add_handler(results_handler)
 
-    application.run_polling()
+    application.run_polling(timeout=60)
