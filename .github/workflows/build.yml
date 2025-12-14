@@ -16,7 +16,7 @@ jobs:
       - name: Install pipenv
         run: pip install pipenv
       - name: Install dependencies
-        run: pipenv install --deploy
+        run: pipenv install --dev --deploy
       - name: Run tests
         run: pipenv run python -m pytest
   docker:
