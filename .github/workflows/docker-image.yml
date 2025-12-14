@@ -55,5 +55,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/anonymous_poll_bot
-          cache-to: type=inline
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
