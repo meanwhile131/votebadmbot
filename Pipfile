@@ -7,6 +7,9 @@ name = "pypi"
 python-telegram-bot = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
+pytest-mock = "*"
 
 [requires]
 python_version = "3.13"
