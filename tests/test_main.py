@@ -7,10 +7,9 @@ import os
 
 @pytest.fixture(scope="function", autouse=True)
 def db():
-    if os.path.exists("data/test.db"):
-        os.remove("data/test.db")
-
-    with patch('sqlite3.connect', return_value=sqlite3.connect('data/test.db')) as mock_connect:
+    db_connection = sqlite3.connect(':memory:')
+    
+    with patch('sqlite3.connect', return_value=db_connection) as mock_connect:
         with patch('telegram.ext.Application.run_polling'):
             with patch.dict(os.environ, {"BOT_TOKEN": "test_token"}):
                 try:
@@ -19,16 +18,13 @@ def db():
                     # This is expected if BOT_TOKEN is not set, which is fine for tests
                     pass
 
-    db_connection = mock_connect.return_value
     cur = db_connection.cursor()
 
-    with patch('main.db', db_connection):
-        with patch('main.cur', cur):
+    with patch('src.main.db', db_connection):
+        with patch('src.main.cur', cur):
             yield db_connection
 
     db_connection.close()
-    os.remove("data/test.db")
-
 
 @pytest.mark.asyncio
 async def test_start_private_chat():
