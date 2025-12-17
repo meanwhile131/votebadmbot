@@ -10,6 +10,7 @@ python-telegram-bot = "*"
 pytest = "*"
 pytest-asyncio = "*"
 pytest-mock = "*"
+pytest-cov = "*"
 
 [requires]
 python_version = "3.13"
