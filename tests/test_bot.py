@@ -1,7 +1,9 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-from src.bot import Bot, UserConversationState
 import sqlite3
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from src.bot import Bot, UserConversationState
 
 
 @pytest.fixture(scope="function")
@@ -174,6 +176,29 @@ async def test_vote_button_change_vote(bot, db):
     assert "изменен" in query.answer.call_args[0][0]
     cur.execute("SELECT vote FROM votes WHERE poll_id = 1 AND caster_id = 456")
     assert cur.fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_vote_button_no_change_vote(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 456
+    update.effective_user.first_name = "John"
+    update.effective_user.last_name = "Doe"
+    query = AsyncMock()
+    query.data = "1 1"
+    update.callback_query = query
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    cur.execute(
+        "INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(1, 456, 1, 'John Doe', 12345)")
+    db.commit()
+
+    await bot.vote_button(update, MagicMock())
+
+    query.answer.assert_called_once()
+    assert "не изменен" in query.answer.call_args[0][0]
+    cur.execute("SELECT vote FROM votes WHERE poll_id = 1 AND caster_id = 456")
+    assert cur.fetchone()[0] == 1
 
 
 @pytest.mark.asyncio
