@@ -115,18 +115,18 @@ class Bot:
                 "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 1 ORDER BY timestamp ASC;", [poll_id])
             votes_1 = cursor.fetchall()
             msg += f"\nБуду ({len(votes_1)}):<pre>\n"
-            for vote in votes_1:
+            for idx, vote in enumerate(votes_1):
                 caster = vote[0]
-                msg += f"{caster}\n"
+                msg += f"{idx+1}: {caster}\n"
             msg += "</pre>"
 
             cursor = self.cursor.execute(
                 "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 0 ORDER BY timestamp ASC;", [poll_id])
             votes_0 = cursor.fetchall()
             msg += f"\nНе буду ({len(votes_0)}):<pre>\n"
-            for vote in votes_0:
+            for idx, vote in enumerate(votes_0):
                 caster = vote[0]
-                msg += f"{caster}\n"
+                msg += f"{idx+1}: {caster}\n"
             msg += "</pre>"
             context.user_data["state"] = UserConversationState.NONE
             await context.bot.send_message(update.effective_chat.id, msg, ParseMode.HTML)
