@@ -53,23 +53,24 @@ class Bot:
 • /new - создать голосование
 • /results - посмотреть результаты опроса""", ParseMode.HTML)
             return
-        if len(context.args) == 1:
-            try:
-                poll_id = int(context.args[0])
-            except ValueError:
-                await update.message.reply_text("Не правильно указан номер опроса.")
-                return
-            cursor = self.cursor.execute("SELECT owner,title FROM polls WHERE id = ?", [poll_id])
-            poll = cursor.fetchone()
-            if poll is None:
-                await update.message.reply_text("Не найден опрос.")
-                return
-            if poll[0] != update.effective_user.id:
-                return
-            title = poll[1]
-            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Буду", callback_data=f"{poll_id} 1"),
-                                                  InlineKeyboardButton("Не буду", callback_data=f"{poll_id} 0"), ]])
-            await context.bot.send_message(update.effective_chat.id, f"{title} (#{poll_id})", reply_markup=reply_markup)
+        if len(context.args) != 1:
+            return
+        try:
+            poll_id = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("Не правильно указан номер опроса.")
+            return
+        cursor = self.cursor.execute("SELECT owner,title FROM polls WHERE id = ?", [poll_id])
+        poll = cursor.fetchone()
+        if poll is None:
+            await update.message.reply_text("Не найден опрос.")
+            return
+        if poll[0] != update.effective_user.id:
+            return
+        title = poll[1]
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Буду", callback_data=f"{poll_id} 1"),
+                                                InlineKeyboardButton("Не буду", callback_data=f"{poll_id} 0"), ]])
+        await context.bot.send_message(update.effective_chat.id, f"{title} (#{poll_id})", reply_markup=reply_markup)
 
     async def new(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id

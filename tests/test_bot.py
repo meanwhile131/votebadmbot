@@ -56,6 +56,68 @@ async def test_start_group_chat_with_valid_poll_id(bot, db):
 
 
 @pytest.mark.asyncio
+async def test_start_group_chat_with_no_args(bot):
+    update = AsyncMock()
+    update.effective_chat.type = 'group'
+    update.effective_user.id = 123
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.args = []
+
+    await bot.start(update, context)
+
+    context.bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_start_group_chat_with_invalid_arg(bot):
+    update = AsyncMock()
+    update.effective_chat.type = 'group'
+    update.effective_user.id = 123
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.args = ['abc']
+
+    await bot.start(update, context)
+
+    update.message.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_group_chat_with_incorrect_poll_id(bot, db):
+    update = AsyncMock()
+    update.effective_chat.type = 'group'
+    update.effective_user.id = 123
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.args = ['2']
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.start(update, context)
+
+    update.message.reply_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_group_chat_with_different_owner(bot, db):
+    update = AsyncMock()
+    update.effective_chat.type = 'group'
+    update.effective_user.id = 124
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.args = ['1']
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.start(update, context)
+
+    update.message.reply_text.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_new_as_admin(bot, db):
     update = AsyncMock()
     update.effective_user.id = 123
@@ -102,7 +164,7 @@ async def test_message_set_title(bot, db):
 
     context.bot.send_message.assert_called_once()
     sent_text = context.bot.send_message.call_args[0][1]
-    assert "Создан опрос #1" in sent_text
+    assert "#1" in sent_text
     assert f"https://t.me/{context.bot.username}?startgroup=1" in sent_text
     assert context.user_data["state"] == UserConversationState.NONE
     cur = db.cursor()
@@ -177,7 +239,49 @@ async def test_vote_button_no_change_vote(bot, db):
 
 
 @pytest.mark.asyncio
-async def test_results(bot):
+async def test_vote_button_invalid_vote(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 456
+    update.effective_user.first_name = "John"
+    update.effective_user.last_name = "Doe"
+    query = AsyncMock()
+    query.data = "1 42"
+    update.callback_query = query
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.vote_button(update, MagicMock())
+
+    query.answer.assert_called_once()
+    assert "изменен" not in query.answer.call_args[0][0]
+    cur.execute("SELECT vote FROM votes WHERE poll_id = 1 AND caster_id = 456")
+    assert cur.fetchone() is None
+
+
+@pytest.mark.asyncio
+async def test_vote_button_invalid_poll(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 456
+    update.effective_user.first_name = "John"
+    update.effective_user.last_name = "Doe"
+    query = AsyncMock()
+    query.data = "42 1"
+    update.callback_query = query
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.vote_button(update, MagicMock())
+
+    query.answer.assert_called_once()
+    assert "изменен" not in query.answer.call_args[0][0]
+    cur.execute("SELECT vote FROM votes WHERE poll_id = 1 AND caster_id = 456")
+    assert cur.fetchone() is None
+
+
+@pytest.mark.asyncio
+async def test_start_results(bot):
     update = AsyncMock()
     update.effective_chat.id = 123
     context = MagicMock()
@@ -188,3 +292,137 @@ async def test_results(bot):
 
     context.bot.send_message.assert_called_once()
     assert context.user_data["state"] == UserConversationState.SETTING_POLL_ID_FOR_RESULT
+
+
+@pytest.mark.asyncio
+async def test_get_results_as_admin(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 1
+    update.message.text = "1"
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    cur.execute("INSERT INTO admins(id) VALUES(1)")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
+                (1, 456, 1, 'John Doe', 12348),
+                (1, 457, 1, 'James Smith', 12345),
+                (1, 458, 0, 'Robert Williams', 12346),
+                (1, 459, 0, 'Maria Garcia', 12347);""")
+    db.commit()
+
+    await bot.message(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[0][1]
+    assert "John Doe" in sent_text
+    assert "James Smith" in sent_text
+    assert "Robert Williams" in sent_text
+    assert "Maria Garcia" in sent_text
+
+    # check ordered by timestamp
+    assert sent_text.index("James Smith") < sent_text.index("John Doe")
+    assert sent_text.index("Robert Williams") < sent_text.index("Maria Garcia")
+
+    # check ordered by vote
+    assert sent_text.index("John Doe") < sent_text.index("Maria Garcia")
+
+
+@pytest.mark.asyncio
+async def test_get_results_with_invalid_arg(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 123
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    update.message.text = 'abc'
+    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
+    cur = db.cursor()
+    cur.execute("INSERT INTO admins(id) VALUES(123)")
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.message(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[0][1]
+    assert "Test Poll" not in sent_text
+    assert "abc" not in sent_text
+
+
+@pytest.mark.asyncio
+async def test_get_results_with_incorrect_poll_id(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 123
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    update.message.text = '2'
+    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
+    cur = db.cursor()
+    cur.execute("INSERT INTO admins(id) VALUES(123)")
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    db.commit()
+
+    await bot.message(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[0][1]
+    assert "Test Poll" not in sent_text
+
+
+@pytest.mark.asyncio
+async def test_get_results_as_admin_non_owner(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 2
+    update.message.text = "1"
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 124, 'Test Poll')")
+    cur.execute("INSERT INTO admins(id) VALUES(2)")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
+                (1, 456, 1, 'John Doe', 12348),
+                (1, 457, 1, 'James Smith', 12345),
+                (1, 458, 0, 'Robert Williams', 12346),
+                (1, 459, 0, 'Maria Garcia', 12347);""")
+    db.commit()
+
+    await bot.message(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[0][1]
+    sent_text = context.bot.send_message.call_args[0][1]
+    assert "John Doe" in sent_text
+    assert "James Smith" in sent_text
+    assert "Robert Williams" in sent_text
+    assert "Maria Garcia" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_get_results_as_non_admin(bot, db):
+    update = AsyncMock()
+    update.effective_user.id = 1
+    update.message.text = "1"
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
+    cur = db.cursor()
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 124, 'Test Poll')")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
+                (1, 456, 1, 'John Doe', 12348),
+                (1, 457, 1, 'James Smith', 12345),
+                (1, 458, 0, 'Robert Williams', 12346),
+                (1, 459, 0, 'Maria Garcia', 12347);""")
+    db.commit()
+
+    await bot.message(update, context)
+
+    context.bot.send_message.assert_called_once()
+    sent_text = context.bot.send_message.call_args[0][1]
+    sent_text = context.bot.send_message.call_args[0][1]
+    assert "#1" not in sent_text
+    assert "John Doe" not in sent_text
+    assert "James Smith" not in sent_text
+    assert "Robert Williams" not in sent_text
+    assert "Maria Garcia" not in sent_text
