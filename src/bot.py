@@ -50,8 +50,8 @@ class Bot:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_chat.type == ChatType.PRIVATE:
             await context.bot.send_message(update.effective_chat.id, """Команды:
-    /new - создать голосование
-    /results - посмотреть результаты опроса""", ParseMode.HTML)
+• /new - создать голосование
+• /results - посмотреть результаты опроса""", ParseMode.HTML)
             return
         if len(context.args) == 1:
             try:
