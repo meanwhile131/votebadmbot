@@ -116,7 +116,7 @@ class Bot:
             cursor = self.cursor.execute(
                 "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 1 ORDER BY timestamp ASC;", [poll_id])
             votes_1 = cursor.fetchall()
-            msg += f"\nБуду ({len(votes_1)}):<pre>\n"
+            msg += f"\nБуду ({len(votes_1)}):\n<pre>"
             for idx, vote in enumerate(votes_1):
                 caster = vote[0]
                 msg += f"{idx+1}: {caster}\n"
@@ -125,7 +125,7 @@ class Bot:
             cursor = self.cursor.execute(
                 "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 0 ORDER BY timestamp ASC;", [poll_id])
             votes_0 = cursor.fetchall()
-            msg += f"\nНе буду ({len(votes_0)}):<pre>\n"
+            msg += f"\nНе буду ({len(votes_0)}):\n<pre>"
             for idx, vote in enumerate(votes_0):
                 caster = vote[0]
                 msg += f"{idx+1}: {caster}\n"
