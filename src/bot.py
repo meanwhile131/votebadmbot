@@ -32,6 +32,10 @@ class Bot:
         results_handler = CommandHandler('results', self.results, filters.ChatType.PRIVATE)
         application.add_handler(results_handler)
 
+    def is_admin(self, user_id: int):
+        cursor = self.cursor.execute("SELECT 1 FROM admins WHERE id = ?;", [user_id])
+        return len(cursor.fetchall()) > 0 # check if any rows found
+
     @staticmethod
     def init_db(database: sqlite3.Connection):
         cursor = database.cursor()
@@ -69,9 +73,7 @@ class Bot:
 
     async def new(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
-        cursor = self.cursor.execute("SELECT 1 FROM admins WHERE id = ?;", [user_id])
-        is_admin = len(cursor.fetchall()) > 0
-        if not is_admin:
+        if not self.is_admin(user_id):
             await context.bot.send_message(update.effective_chat.id,
                                            "Только администраторы бота могут создавать голосования.")
             return
@@ -98,18 +100,18 @@ class Bot:
                 await context.bot.send_message(update.effective_chat.id, "Номер опроса нужно указать как число.")
                 return
 
-            cursor = self.cursor.execute("SELECT * FROM polls WHERE id = ?;", [poll_id])
+            cursor = self.cursor.execute("SELECT id,title FROM polls WHERE id = ?;", [poll_id])
             polls = cursor.fetchall()
             poll_found = len(polls) > 0
             if not poll_found:
                 await context.bot.send_message(update.effective_chat.id, f"Опрос #{poll_id} не найден.")
                 return
             poll = polls[0]
-            if poll[1] != update.effective_user.id:
+            if not self.is_admin(update.effective_user.id):
                 await context.bot.send_message(update.effective_chat.id,
-                                               f"Только создатель опроса может смотреть его результаты.")
+                                               f"Только администраторы бота могут смотреть результаты опросов.")
                 return
-            msg = f'Результаты опроса "{poll[2]}" (#{poll_id}):\n'
+            msg = f'Результаты опроса "{poll[1]}" (#{poll_id}):\n'
 
             cursor = self.cursor.execute(
                 "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 1 ORDER BY timestamp ASC;", [poll_id])
