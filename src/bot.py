@@ -137,15 +137,7 @@ class Bot:
         timestamp = int(time.time())
         query = update.callback_query
         caster_id = update.effective_user.id
-        if update.effective_user.first_name:
-            first_name = update.effective_user.first_name
-        else:
-            first_name = ""
-        if update.effective_user.last_name:
-            last_name = update.effective_user.last_name
-        else:
-            last_name = ""
-        caster_name = f"{first_name} {last_name}"
+        caster_name = update.effective_user.full_name
         try:
             poll_id, vote = map(int, query.data.split())
             if vote not in [0, 1]:
