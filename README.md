@@ -2,4 +2,4 @@
 [![Docker container](https://github.com/meanwhile131/anonymous-poll-bot/actions/workflows/docker.yml/badge.svg)](https://github.com/meanwhile131/anonymous-poll-bot/actions/workflows/docker.yml)
 [![CodeQL](https://github.com/meanwhile131/anonymous-poll-bot/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/meanwhile131/anonymous-poll-bot/actions/workflows/github-code-scanning/codeql)
 
-[@AnonymousPollBot](https://t.me/AnonymousPollBot)
+[@votebadmbot](https://t.me/votebadmbot)
