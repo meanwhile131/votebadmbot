@@ -114,8 +114,7 @@ async def test_message_set_title(bot, db):
 async def test_vote_button_new_vote(bot, db):
     update = AsyncMock()
     update.effective_user.id = 456
-    update.effective_user.first_name = "John"
-    update.effective_user.last_name = "Doe"
+    update.effective_user.full_name = "John Doe"
     query = AsyncMock()
     query.data = "1 1"
     update.callback_query = query
