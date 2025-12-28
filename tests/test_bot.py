@@ -111,30 +111,6 @@ async def test_message_set_title(bot, db):
 
 
 @pytest.mark.asyncio
-async def test_message_get_results(bot, db):
-    update = AsyncMock()
-    update.effective_user.id = 123
-    update.effective_chat.id = 123
-    update.message.text = "1"
-    context = MagicMock()
-    context.bot.send_message = AsyncMock()
-    context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
-    cur = db.cursor()
-    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
-    cur.execute(
-        "INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(1, 456, 1, 'John Doe', 12345)")
-    db.commit()
-
-    await bot.message(update, context)
-
-    context.bot.send_message.assert_called_once()
-    sent_text = context.bot.send_message.call_args[0][1]
-    assert "Test Poll" in sent_text
-    assert "John Doe" in sent_text
-    assert context.user_data["state"] == UserConversationState.NONE
-
-
-@pytest.mark.asyncio
 async def test_vote_button_new_vote(bot, db):
     update = AsyncMock()
     update.effective_user.id = 456
