@@ -2,7 +2,7 @@ import sqlite3
 import time
 from enum import Enum
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, User
 from telegram.constants import ParseMode, ChatType
 from telegram.ext import ContextTypes, CommandHandler, filters, MessageHandler, CallbackQueryHandler
 
@@ -36,14 +36,23 @@ class Bot:
         cursor = self.cursor.execute("SELECT 1 FROM admins WHERE id = ?;", [user_id])
         return len(cursor.fetchall()) > 0 # check if any rows found
 
+    def get_caster_name(self, caster: User):
+        cursor = self.cursor.execute("SELECT name FROM casters WHERE id=?;", [caster.id])
+        row = cursor.fetchone()
+        if row is None: # no existing name saved
+            self.cursor.execute("INSERT INTO casters(id, name) VALUES (?, ?);", [caster.id, caster.full_name])
+            self.db.commit()
+            return caster.full_name
+        return row[0]
+
     @staticmethod
     def init_db(database: sqlite3.Connection):
         cursor = database.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
         cursor.execute("CREATE TABLE IF NOT EXISTS polls(id INTEGER PRIMARY KEY, owner INTEGER, title TEXT);")
-        cursor.execute(
-            "CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, caster_name TEXT, timestamp INTEGER, FOREIGN KEY(poll_id) REFERENCES polls(id));")
+        cursor.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, timestamp INTEGER, FOREIGN KEY(poll_id) REFERENCES polls(id), FOREIGN KEY(caster_id) REFERENCES casters(id));")
         cursor.execute("CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS casters(id INTEGER PRIMARY KEY, name TEXT);")
         database.commit()
         return cursor
 
@@ -114,8 +123,10 @@ class Bot:
                 return
             msg = f'Результаты опроса "{poll[1]}" (#{poll_id}):\n'
 
-            cursor = self.cursor.execute(
-                "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 1 ORDER BY timestamp ASC;", [poll_id])
+            cursor = self.cursor.execute("""SELECT casters.name FROM votes
+            JOIN casters ON casters.id = votes.caster_id
+            WHERE votes.poll_id = ? AND votes.vote = 1
+            ORDER BY votes.timestamp ASC;""", [poll_id])
             votes_1 = cursor.fetchall()
             msg += f"\nБуду ({len(votes_1)}):\n<pre>"
             for idx, vote in enumerate(votes_1):
@@ -123,8 +134,10 @@ class Bot:
                 msg += f"{idx+1}: {caster}\n"
             msg += "</pre>"
 
-            cursor = self.cursor.execute(
-                "SELECT caster_name FROM votes WHERE poll_id = ? AND vote = 0 ORDER BY timestamp ASC;", [poll_id])
+            cursor = self.cursor.execute("""SELECT casters.name FROM votes
+            JOIN casters ON casters.id = votes.caster_id
+            WHERE votes.poll_id = ? AND votes.vote = 0
+            ORDER BY votes.timestamp ASC;""", [poll_id])
             votes_0 = cursor.fetchall()
             msg += f"\nНе буду ({len(votes_0)}):\n<pre>"
             for idx, vote in enumerate(votes_0):
@@ -138,7 +151,7 @@ class Bot:
         timestamp = int(time.time())
         query = update.callback_query
         caster_id = update.effective_user.id
-        caster_name = update.effective_user.full_name
+        caster_name = self.get_caster_name(update.effective_user)
         try:
             poll_id, vote = map(int, query.data.split())
             if vote not in [0, 1]:
@@ -170,8 +183,8 @@ class Bot:
             await query.answer("Голос изменен.")
             return
         cursor = self.cursor.execute(
-            "INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(?,?,?,?,?);",
-            [poll_id, caster_id, vote, caster_name, timestamp])
+            "INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES(?,?,?,?);",
+            [poll_id, caster_id, vote, timestamp])
         self.db.commit()
         if cursor.rowcount < 1:
             await query.answer("Ошибка сохранения голоса.")

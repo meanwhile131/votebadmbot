@@ -203,8 +203,8 @@ async def test_vote_button_change_vote(bot, db):
     update.callback_query = query
     cur = db.cursor()
     cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
-    cur.execute(
-        "INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(1, 456, 1, 'John Doe', 12345)")
+    cur.execute("INSERT INTO casters(id, name) VALUES(456, 'John Doe')")
+    cur.execute("INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES(1, 456, 1, 12345)")
     db.commit()
 
     await bot.vote_button(update, MagicMock())
@@ -226,8 +226,8 @@ async def test_vote_button_no_change_vote(bot, db):
     update.callback_query = query
     cur = db.cursor()
     cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
-    cur.execute(
-        "INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES(1, 456, 1, 'John Doe', 12345)")
+    cur.execute("INSERT INTO casters(id, name) VALUES(456, 'John Doe')")
+    cur.execute("INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES(1, 456, 1, 12345)")
     db.commit()
 
     await bot.vote_button(update, MagicMock())
@@ -242,8 +242,7 @@ async def test_vote_button_no_change_vote(bot, db):
 async def test_vote_button_invalid_vote(bot, db):
     update = AsyncMock()
     update.effective_user.id = 456
-    update.effective_user.first_name = "John"
-    update.effective_user.last_name = "Doe"
+    update.effective_user.full_name = "John Doe"
     query = AsyncMock()
     query.data = "1 42"
     update.callback_query = query
@@ -263,8 +262,7 @@ async def test_vote_button_invalid_vote(bot, db):
 async def test_vote_button_invalid_poll(bot, db):
     update = AsyncMock()
     update.effective_user.id = 456
-    update.effective_user.first_name = "John"
-    update.effective_user.last_name = "Doe"
+    update.effective_user.full_name = "John Doe"
     query = AsyncMock()
     query.data = "42 1"
     update.callback_query = query
@@ -295,7 +293,7 @@ async def test_start_results(bot):
 
 
 @pytest.mark.asyncio
-async def test_get_results_as_admin(bot, db):
+async def test_get_results_as_admin_owner(bot, db):
     update = AsyncMock()
     update.effective_user.id = 1
     update.message.text = "1"
@@ -303,13 +301,18 @@ async def test_get_results_as_admin(bot, db):
     context.bot.send_message = AsyncMock()
     context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
     cur = db.cursor()
-    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 1, 'Test Poll')")
     cur.execute("INSERT INTO admins(id) VALUES(1)")
-    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
-                (1, 456, 1, 'John Doe', 12348),
-                (1, 457, 1, 'James Smith', 12345),
-                (1, 458, 0, 'Robert Williams', 12346),
-                (1, 459, 0, 'Maria Garcia', 12347);""")
+    cur.execute("""INSERT INTO casters(id, name) VALUES
+                (456, 'John Doe'),
+                (457, 'James Smith'),
+                (458, 'Robert Williams'),
+                (459, 'Maria Garcia');""")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES
+                (1, 456, 1, 12348),
+                (1, 457, 1, 12345),
+                (1, 458, 0, 12346),
+                (1, 459, 0, 12347);""")
     db.commit()
 
     await bot.message(update, context)
@@ -379,19 +382,23 @@ async def test_get_results_as_admin_non_owner(bot, db):
     context.bot.send_message = AsyncMock()
     context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
     cur = db.cursor()
-    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 124, 'Test Poll')")
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
     cur.execute("INSERT INTO admins(id) VALUES(2)")
-    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
-                (1, 456, 1, 'John Doe', 12348),
-                (1, 457, 1, 'James Smith', 12345),
-                (1, 458, 0, 'Robert Williams', 12346),
-                (1, 459, 0, 'Maria Garcia', 12347);""")
+    cur.execute("""INSERT INTO casters(id, name) VALUES
+                    (456, 'John Doe'),
+                    (457, 'James Smith'),
+                    (458, 'Robert Williams'),
+                    (459, 'Maria Garcia');""")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES
+                    (1, 456, 1, 12348),
+                    (1, 457, 1, 12345),
+                    (1, 458, 0, 12346),
+                    (1, 459, 0, 12347);""")
     db.commit()
 
     await bot.message(update, context)
 
     context.bot.send_message.assert_called_once()
-    sent_text = context.bot.send_message.call_args[0][1]
     sent_text = context.bot.send_message.call_args[0][1]
     assert "John Doe" in sent_text
     assert "James Smith" in sent_text
@@ -408,18 +415,23 @@ async def test_get_results_as_non_admin(bot, db):
     context.bot.send_message = AsyncMock()
     context.user_data = {"state": UserConversationState.SETTING_POLL_ID_FOR_RESULT}
     cur = db.cursor()
-    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 124, 'Test Poll')")
-    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, caster_name, timestamp) VALUES
-                (1, 456, 1, 'John Doe', 12348),
-                (1, 457, 1, 'James Smith', 12345),
-                (1, 458, 0, 'Robert Williams', 12346),
-                (1, 459, 0, 'Maria Garcia', 12347);""")
+    cur.execute("INSERT INTO polls(id, owner, title) VALUES(1, 123, 'Test Poll')")
+    cur.execute("INSERT INTO admins(id) VALUES(123)")
+    cur.execute("""INSERT INTO casters(id, name) VALUES
+                    (456, 'John Doe'),
+                    (457, 'James Smith'),
+                    (458, 'Robert Williams'),
+                    (459, 'Maria Garcia');""")
+    cur.execute("""INSERT INTO votes(poll_id, caster_id, vote, timestamp) VALUES
+                    (1, 456, 1, 12348),
+                    (1, 457, 1, 12345),
+                    (1, 458, 0, 12346),
+                    (1, 459, 0, 12347);""")
     db.commit()
 
     await bot.message(update, context)
 
     context.bot.send_message.assert_called_once()
-    sent_text = context.bot.send_message.call_args[0][1]
     sent_text = context.bot.send_message.call_args[0][1]
     assert "#1" not in sent_text
     assert "John Doe" not in sent_text
