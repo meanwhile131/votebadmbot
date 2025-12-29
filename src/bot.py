@@ -78,7 +78,7 @@ class Bot:
             return
         title = poll[1]
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Буду", callback_data=f"{poll_id} 1"),
-                                                InlineKeyboardButton("Не буду", callback_data=f"{poll_id} 0"), ]])
+                                                InlineKeyboardButton("Нет", callback_data=f"{poll_id} 0"), ]])
         await context.bot.send_message(update.effective_chat.id, f"{title} (#{poll_id})", reply_markup=reply_markup)
 
     async def new(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,7 +139,7 @@ class Bot:
             WHERE votes.poll_id = ? AND votes.vote = 0
             ORDER BY votes.timestamp ASC;""", [poll_id])
             votes_0 = cursor.fetchall()
-            msg += f"\nНе буду ({len(votes_0)}):\n<pre>"
+            msg += f"\nНет ({len(votes_0)}):\n<pre>"
             for idx, vote in enumerate(votes_0):
                 caster = vote[0]
                 msg += f"{idx+1}: {caster}\n"
