@@ -50,9 +50,9 @@ class Bot:
         cursor = database.cursor()
         cursor.execute("PRAGMA foreign_keys = ON;")
         cursor.execute("CREATE TABLE IF NOT EXISTS polls(id INTEGER PRIMARY KEY, owner INTEGER, title TEXT);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, timestamp INTEGER, FOREIGN KEY(poll_id) REFERENCES polls(id), FOREIGN KEY(caster_id) REFERENCES casters(id));")
         cursor.execute("CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY);")
         cursor.execute("CREATE TABLE IF NOT EXISTS casters(id INTEGER PRIMARY KEY, name TEXT);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS votes(poll_id INTEGER, caster_id INTEGER, vote INTEGER, timestamp INTEGER, FOREIGN KEY(poll_id) REFERENCES polls(id), FOREIGN KEY(caster_id) REFERENCES casters(id));")
         database.commit()
         return cursor
 
